@@ -50,9 +50,16 @@ async function run() {
     //send order data in mongodb
     app.post('/order', async (req, res) => {
       const order = req.body;
-      console.log(order);
       const result = await ordersCollection.insertOne(order);
       res.send(result)
+    })
+
+    //load order by email
+    app.get('/order', async (req, res) => {
+      const email = req.query.email;
+      const query = { orderEmail: email };
+      const orders = await ordersCollection.find(query).toArray();
+      res.send(orders);
     })
 
   } finally {
