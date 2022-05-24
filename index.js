@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require('jsonwebtoken');
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
@@ -16,12 +17,28 @@ const client = new MongoClient(uri, {
   serverApi: ServerApiVersion.v1,
 });
 
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: 'UnAuthorized access' });
+  }
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: 'Forbidden access' })
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
+
 async function run() {
   try {
     await client.connect();
     const productsCollection = client.db("toolsManufacturer").collection("products");
     const reviewsCollection = client.db("toolsManufacturer").collection("reviews");
     const ordersCollection = client.db("toolsManufacturer").collection("orders");
+    const usersCollection = client.db("toolsManufacturer").collection("users");
 
     //load all products from mongodb
     app.get("/products", async (req, res) => {
@@ -39,6 +56,21 @@ async function run() {
       res.send(product);
     });
 
+
+    //user add and update
+    app.put('/user/:email', async (req, res) => {
+      const email = req.params.email;
+      const user = req.body;
+      const filter = { email: email };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: user,
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc, options);
+      const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+      res.send({ result, token })
+    })
+
     //load all review form mongodb
     app.get("/reviews", async (req, res) => {
       const query = {};
@@ -55,11 +87,17 @@ async function run() {
     })
 
     //load order by email
-    app.get('/order', async (req, res) => {
+    app.get('/order', verifyJWT, async (req, res) => {
       const email = req.query.email;
-      const query = { orderEmail: email };
-      const orders = await ordersCollection.find(query).toArray();
-      res.send(orders);
+      const decodedEmail = req.decoded.email;
+      if (email === decodedEmail) {
+        const query = { orderEmail: email };
+        const orders = await ordersCollection.find(query).toArray();
+        return res.send(orders);
+      }
+      else {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
     })
 
   } finally {
