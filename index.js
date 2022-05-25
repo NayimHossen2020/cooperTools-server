@@ -48,6 +48,13 @@ async function run() {
       res.send(products);
     });
 
+    //add one items
+    app.post('/products', async (req, res) => {
+      const newService = req.body;
+      const result = await productsCollection.insertOne(newService);
+      res.send(result);
+    })
+
     //load single data from mongodb using _id
     app.get('/products/:id', async (req, res) => {
       const id = req.params.id;
@@ -66,7 +73,6 @@ async function run() {
     //checking admin or not
     app.get('/admin/:email', async (req, res) => {
       const email = req.params.email;
-      console.log(email);
       const user = await usersCollection.findOne({ email: email });
       const isAdmin = user.role === 'admin';
       res.send({ isAdmin: isAdmin })
@@ -111,6 +117,13 @@ async function run() {
       const reviews = await cursor.toArray();
       res.send(reviews);
     });
+
+    //add review
+    app.post('/reviews', async (req, res) => {
+      const newService = req.body;
+      const result = await reviewsCollection.insertOne(newService);
+      res.send(result);
+    })
 
     //send order data in mongodb
     app.post('/order', async (req, res) => {
