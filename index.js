@@ -40,6 +40,18 @@ async function run() {
     const ordersCollection = client.db("toolsManufacturer").collection("orders");
     const usersCollection = client.db("toolsManufacturer").collection("users");
 
+    //verifyAdmin
+    const verifyAdmin = async (req, res, next) => {
+      const requester = req.decoded.email;
+      const requesterAccount = await usersCollection.findOne({ email: requester });
+      if (requesterAccount.role === 'admin') {
+        next();
+      }
+      else {
+        res.status(403).send({ message: 'forbidden' });
+      }
+    }
+
     //load all products from mongodb
     app.get("/products", async (req, res) => {
       const query = {};
@@ -49,9 +61,17 @@ async function run() {
     });
 
     //add one items
-    app.post('/products', async (req, res) => {
+    app.post('/products', verifyJWT, verifyAdmin, async (req, res) => {
       const newService = req.body;
       const result = await productsCollection.insertOne(newService);
+      res.send(result);
+    })
+
+    //delete products
+    app.delete('/products/:id', verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const result = await productsCollection.deleteOne(query);
       res.send(result);
     })
 
@@ -81,19 +101,12 @@ async function run() {
     //set admin in 
     app.put('/user/admin/:email', verifyJWT, async (req, res) => {
       const email = req.params.email;
-      const requester = req.decoded.email;
-      const requesterAccount = await usersCollection.findOne({ email: requester });
-      if (requesterAccount.role === 'admin') {
-        const filter = { email: email };
-        const updateDoc = {
-          $set: { role: 'admin' },
-        };
-        const result = await usersCollection.updateOne(filter, updateDoc);
-        res.send(result)
-      }
-      else {
-        res.status(403).send({ message: 'forbidden' })
-      }
+      const filter = { email: email };
+      const updateDoc = {
+        $set: { role: 'admin' },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc);
+      res.send(result);
     })
 
     //user add and update
@@ -119,7 +132,7 @@ async function run() {
     });
 
     //add review
-    app.post('/reviews', async (req, res) => {
+    app.post('/reviews', verifyJWT, async (req, res) => {
       const newService = req.body;
       const result = await reviewsCollection.insertOne(newService);
       res.send(result);
